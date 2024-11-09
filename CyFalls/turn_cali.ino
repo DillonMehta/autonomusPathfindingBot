@@ -41,9 +41,9 @@ double Kps = 6; //to go straight, only affects right motor
 //turning
 double t1min = 35;
 double t2min = 35;
-double Kpt = 0.15; //for turning
-double left_angle=85.7;
-double right_angle=86.2;
+double Kpt = 0.5; //for turning
+double left_angle=85.37;
+double right_angle=85.37;
 
 //IR Sensor for Angular Velocity
 
@@ -67,9 +67,24 @@ void setup() {
   turn_left();
   turn_left();
   turn_left();
-
+  turn_left();
+  turn_left();
+  turn_left();
+  turn_left();
+  turn_left();
+  turn_left();
+  turn_left();
+  turn_left();
   delay(5000);
 
+  turn_right();
+  turn_right();
+  turn_right();
+  turn_right();
+  turn_right();
+  turn_right();
+  turn_right();
+  turn_right();
   turn_right();
   turn_right();
   turn_right();

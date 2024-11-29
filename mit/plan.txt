@@ -1,0 +1,7 @@
+backward movement
+experiment with one-point turns. 
+make on-site coding faster with easier movement
+figure out where inconsistency is coming from and fix it 
+  Likely culprits: stationary turning, wheels + tape interaction, initial high speed jolt. 
+very basic delay addition function.
+jingle bells

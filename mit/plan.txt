@@ -1,4 +1,5 @@
 backward movement
+trapezoid
 experiment with one-point turns. 
 make on-site coding faster with easier movement
 figure out where inconsistency is coming from and fix it 

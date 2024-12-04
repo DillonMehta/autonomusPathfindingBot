@@ -78,7 +78,7 @@ void reset() {
 double d1(){return eCount / (CLICKS_PER_ROTATION * GEAR_RATIO) * WHEEL_CIRCUMFERENCE;}
 double d2(){return eCount2 / (CLICKS_PER_ROTATION * GEAR_RATIO) * WHEEL_CIRCUMFERENCE;}
 
-void fwd(int intent) {
+void move(int intent) {
   //debug
   //Serial.println("forward");
   turnSensorUpdate();

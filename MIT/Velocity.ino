@@ -32,7 +32,7 @@ volatile double eCount2 = 0;
 double vel1;
 double vel2;
 //Movement Values (Change here) ------------------------------------------------------------------------------------------------------------------------
-
+double targetTime = 60;
 double s1min = 30; 
 double s2min = 30;
 double Ks = 1; // to reach the proper distance
@@ -43,16 +43,21 @@ double t2min = 35;
 double Kpt = 0.5; //for turning
 double left_angle=85.37;
 double right_angle=85.37;
+char[200] movement = "F30 B30 L R E";
 
-
-
-
+void move_control(){
+  int c = 0;
+  while(movement[c] != 'E'){
+    if(movement[c]==
+  }
+}
 //DRIVING -------------------------------------------------------------------------------------------------------------------
 void setup() {
   delay(1000);
   turnSensorSetup();
   turnSensorReset();
-
+  parseMovementCommands(movement);
+  
   buzzer.playFrequency(440, 200, 15);
   buzzer.playFrequency(440, 200, 15);
  
@@ -130,7 +135,70 @@ void right() {
 void loop() {
 
 }
+void parseMovementCommands(char* commands) {
+  int len = strlen(commands);
+  int i = 0;
+  
+  while (i < len) {
+    // Skip any whitespace
+    while (i < len && isspace(commands[i])) {
+      i++;
+    }
+    
+    // Check if we've reached the end of the string
+    if (i >= len) break;
+    
+    // Parse command
+    switch (commands[i]) {
+      case 'F': // Forward
+        // Look for the number following F or B
+          i++; // Move past F or B
+          int distance = 0;
+          
+          // Parse the number
+          while (i < len && isdigit(commands[i])) {
+            distance = distance * 10 + (commands[i] - '0');
+            i++;
+          }
 
+          move(distance);
+          break;
+      case 'B': // Backward
+        
+          // Look for the number following F or B
+          i++; // Move past F or B
+          int distance = 0;
+          
+          // Parse the number
+          while (i < len && isdigit(commands[i])) {
+            distance = distance * 10 + (commands[i] - '0');
+            i++;
+          }
+          
+          back(distance);
+          break;
+      
+      case 'L': // Left turn
+        left();
+        i++;
+        break;
+      
+      case 'R': // Right turn
+        right();
+        i++;
+        break;
+      
+      case 'E': // End of commands
+        end();
+        return; // Exit the function completely
+      
+      default:
+        // Skip any unrecognized characters
+        i++;
+        break;
+    }
+  }
+}
 //Pololu included gyro stuff
 
 // This should be called to set the starting point for measuring

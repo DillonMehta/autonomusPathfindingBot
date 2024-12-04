@@ -10,7 +10,7 @@ Encoders encoders;
 Buzzer buzzer;
 Motors motors;
 IMU imu;
-//Physical Constants ----------------------------------------------------------------------------------------------------------
+//Don't Touch ----------------------------------------------------------------------------------------------------------
 const int CLICKS_PER_ROTATION = 12;
 const float GEAR_RATIO = 29.86F;
 const float WHEEL_DIAMETER = 3.2;
@@ -24,7 +24,13 @@ uint32_t turnAngle = 0;
 int16_t turnRate;
 int16_t gyroOffset;
 uint16_t gyroLastUpdate = 0;
+double t_zero = 0;
+double startTime;
 
+volatile double eCount = 0;
+volatile double eCount2 = 0;
+double vel1;
+double vel2;
 //Movement Values (Change here) ------------------------------------------------------------------------------------------------------------------------
 
 double s1min = 30; 
@@ -39,81 +45,25 @@ double left_angle=85.37;
 double right_angle=85.37;
 
 
-//IR Sensor for Angular Velocity
-
-volatile double eCount = 0;
-volatile double eCount2 = 0;
-volatile double dT = 0;
-volatile double dT2 = 0;
 
 
+//DRIVING -------------------------------------------------------------------------------------------------------------------
 void setup() {
   delay(1000);
   turnSensorSetup();
   turnSensorReset();
 
   buzzer.playFrequency(440, 200, 15);
-  fwd(30);
-  right();
-  fwd(50);
-  left();
-  fwd(50);
-  left();
-  fwd(100);
-  left();
-  fwd(50);
-  right();
-  fwd(50);
-  right();
-  
-  fwd(100);
-  right();
-  fwd(50);
-  left();
-  fwd(50);
-  right();
-  fwd(100);
-
-  right();
-  fwd(50);
-  left();
-  fwd(50);
-  left();
-  fwd(50);
-  left();
-  left();
-
-  fwd(50);
-  right();
-  fwd(50);
-  left();
-  fwd(100);
-  left();
-  fwd(50);
-  left();
-  fwd(50);
-  right();
-  right();
-
-  fwd(50);
-  right();
-  fwd(50);
-  right();
-  fwd(150);
-  left();
-  fwd(89);
   buzzer.playFrequency(440, 200, 15);
  
 delay(5000);
 }
 
-void count() {
+void update() {
   eCount= encoders.getCountsLeft();
   eCount2 = encoders.getCountsRight();
+  
 }
-//DRIVING -------------------------------------------------------------------------------------------------------------------
-
-
 void reset() {
   encoders.getCountsAndResetLeft();
   encoders.getCountsAndResetRight();
@@ -127,12 +77,11 @@ void fwd(int intent) {
   //debug
   //Serial.println("forward");
   turnSensorUpdate();
-  count();
   
   while (!(d1() >= intent/4)) {
     turnSensorUpdate();
     count();
-    motors.setSpeeds( d1() * Ks + s1min, (intent - d1()) * Kpf + s2min - ang() * Kps);
+    
 
   } 
     motors.setSpeeds(0, 0);
@@ -176,6 +125,7 @@ void right() {
   
 }
 
+//helper functions -----------------------------------------------------------------------
 
 void loop() {
 

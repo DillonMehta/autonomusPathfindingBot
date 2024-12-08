@@ -24,39 +24,41 @@ uint32_t turnAngle = 0;
 int16_t turnRate;
 int16_t gyroOffset;
 uint16_t gyroLastUpdate = 0;
-double t_zero = 0;
+double lt0;
+double ls0;
+double rt0;
+double rs0;
 double startTime;
-
+double total_distance;
 volatile double eCount = 0;
 volatile double eCount2 = 0;
 double vel1;
 double vel2;
-//Movement Values (Change here) ------------------------------------------------------------------------------------------------------------------------
-double targetTime = 60;
-double s1min = 30; 
-double s2min = 30;
-double Ks = 1; // to reach the proper distance
-double Kps = 6; //to go straight, only affects right motor
 //turning
 double t1min = 35;
 double t2min = 35;
 double Kpt = 0.5; //for turning
 double left_angle=85.37;
 double right_angle=85.37;
-char[200] movement = "F30 B30 L R E";
+double s1min = 30; 
+double s2min = 30;
+double Ks = 1; // to reach the proper distance
+double Kps = 6; //to go straight, only affects right motor
+//Movement Values (Change here) ------------------------------------------------------------------------------------------------------------------------
 
-void move_control(){
-  int c = 0;
-  while(movement[c] != 'E'){
-    if(movement[c]==
-  }
-}
+double targetTime = 60;
+
+
+char movement[200] = "F30 B30 L R E ";
+
+
+
 //DRIVING -------------------------------------------------------------------------------------------------------------------
 void setup() {
   delay(1000);
   turnSensorSetup();
   turnSensorReset();
-  parseMovementCommands(movement);
+  
   
   buzzer.playFrequency(440, 200, 15);
   buzzer.playFrequency(440, 200, 15);
@@ -65,6 +67,7 @@ delay(5000);
 }
 
 void update() {
+  turnSensorUpdate();
   eCount= encoders.getCountsLeft();
   eCount2 = encoders.getCountsRight();
   
@@ -75,59 +78,56 @@ void reset() {
   turnSensorReset();
   turnAngle=0;
 }
-double d1(){return eCount / (CLICKS_PER_ROTATION * GEAR_RATIO) * WHEEL_CIRCUMFERENCE;}
-double d2(){return eCount2 / (CLICKS_PER_ROTATION * GEAR_RATIO) * WHEEL_CIRCUMFERENCE;}
+double dL(){return eCount / (CLICKS_PER_ROTATION * GEAR_RATIO) * WHEEL_CIRCUMFERENCE;}
+double dR(){return eCount2 / (CLICKS_PER_ROTATION * GEAR_RATIO) * WHEEL_CIRCUMFERENCE;}
+double vL(){
+  int vel = (dL()-ls0)/(micros()-lt0)*10000;
+  ls0 = dL();
+  lt0 = micros();
+  return vel;
+}
+double vR(){
+  int vel = (dr()-rs0)/(micros()-rt0)*100000;
+  rs0 = dR();
+  rt0 = micros();
+  return vel;
+}
 
-void move(int intent) {
+void fwd(int intent) {
   //debug
   //Serial.println("forward");
-  turnSensorUpdate();
+  update();
   
-  while (!(d1() >= intent/4)) {
-    turnSensorUpdate();
-    count();
-    
-
+  while (!(dL() >= intent/4)) {
+    update();
   } 
     motors.setSpeeds(0, 0);
     delay(300);
     reset();
-  
 }
-
-
+void end() {
+  fwd(44);
+}
 void left() {
   Serial.println("Turn Left");
-  turnSensorUpdate();
+  
   while (ang() < left_angle) {
-    turnSensorUpdate();
-    count();
     motors.setSpeeds(-t1min - abs(left_angle - (ang())) * Kpt, t2min + abs(left_angle - (ang())) * Kpt);
   } 
-    // Serial.print(fAngle);
-    // Serial.print("\t");
-    // Serial.println(angle);
     motors.setSpeeds(0,0);
     delay(250);
     reset();
-  
 }
 
 void right() {
-  Serial.println("Turn Right");
-  turnSensorUpdate();
-  while (ang() > -right_angle) {
-    turnSensorUpdate();
-    count();
-    count();
+ 
+  while (ang() > -right_angle) {  
+    update();
     motors.setSpeeds(t1min + abs(right_angle + (ang())) * Kpt, -t2min - abs(right_angle + (ang())) * Kpt);
   }   // -90 < fullTurn < 0
     motors.setSpeeds(0,0);
     delay(250);
     reset();
-    
-    
-  
 }
 
 //helper functions -----------------------------------------------------------------------
@@ -135,70 +135,54 @@ void right() {
 void loop() {
 
 }
-void parseMovementCommands(char* commands) {
-  int len = strlen(commands);
-  int i = 0;
-  
-  while (i < len) {
-    // Skip any whitespace
-    while (i < len && isspace(commands[i])) {
-      i++;
-    }
-    
-    // Check if we've reached the end of the string
-    if (i >= len) break;
-    
-    // Parse command
-    switch (commands[i]) {
-      case 'F': // Forward
-        // Look for the number following F or B
-          i++; // Move past F or B
-          int distance = 0;
-          
-          // Parse the number
-          while (i < len && isdigit(commands[i])) {
-            distance = distance * 10 + (commands[i] - '0');
-            i++;
-          }
-
-          move(distance);
-          break;
-      case 'B': // Backward
-        
-          // Look for the number following F or B
-          i++; // Move past F or B
-          int distance = 0;
-          
-          // Parse the number
-          while (i < len && isdigit(commands[i])) {
-            distance = distance * 10 + (commands[i] - '0');
-            i++;
-          }
-          
-          back(distance);
-          break;
-      
-      case 'L': // Left turn
-        left();
-        i++;
-        break;
-      
-      case 'R': // Right turn
-        right();
-        i++;
-        break;
-      
-      case 'E': // End of commands
-        end();
-        return; // Exit the function completely
-      
-      default:
-        // Skip any unrecognized characters
-        i++;
-        break;
+void calculateTotalDistance(const char* commands) {
+  const char* ptr = commands;
+  while (*ptr != '\0') {
+    if (*ptr == 'F' || *ptr == 'B') {
+      ptr++;
+      int distance = 0;
+      while (*ptr >= '0' && *ptr <= '9') {
+        distance = distance * 10 + (*ptr - '0');
+        ptr++;
+      }
+      total_distance += distance;
+    } else {
+      ptr++;
     }
   }
 }
+
+void processCommands(const char* commands) {
+  const char* ptr = commands; // Pointer to traverse the char array
+  while (*ptr != '\0') { // Loop until null terminator
+    if (*ptr == 'F' || *ptr == 'B') {
+      char cmd = *ptr; // Store the command ('F' or 'B')
+      ptr++; // Move to the number part
+      int distance = 0;
+      while (*ptr >= '0' && *ptr <= '9') { // Extract number
+        distance = distance * 10 + (*ptr - '0');
+        ptr++;
+      }
+      if (cmd == 'F') {
+        fwd(distance);
+      } else {
+        back(distance);
+      }
+    } else if (*ptr == 'L') {
+      left();
+      ptr++;
+    } else if (*ptr == 'R') {
+      right();
+      ptr++;
+    } else if (*ptr == 'E') {
+      end();
+      ptr++;
+    } else {
+      ptr++; // Skip unrecognized characters
+    }
+  }
+}
+
 //Pololu included gyro stuff
 
 // This should be called to set the starting point for measuring

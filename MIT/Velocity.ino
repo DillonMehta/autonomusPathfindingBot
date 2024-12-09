@@ -15,11 +15,8 @@ const int CLICKS_PER_ROTATION = 12;
 const float GEAR_RATIO = 29.86F;
 const float WHEEL_DIAMETER = 3.2;
 const float WHEEL_CIRCUMFERENCE = 10.05; 
-const int32_t turnAngle45 = 0x20000000;
 // This constant represents a turn of 90 degrees.
-const int32_t turnAngle90 = turnAngle45 * 2;
-// This constant represents a turn of approximately 1 degree.
-const int32_t turnAngle1 = (turnAngle45 + 22) / 45;
+
 uint32_t turnAngle = 0;
 int16_t turnRate;
 int16_t gyroOffset;
@@ -28,22 +25,21 @@ double lt0;
 double ls0;
 double rt0;
 double rs0;
-double startTime;
+double start_time;
 double total_distance;
 volatile double eCount = 0;
 volatile double eCount2 = 0;
 double vel1;
 double vel2;
+double total_turns=0;
 //turning
-double t1min = 35;
-double t2min = 35;
+double pwm_min = 35;
 double Kpt = 0.5; //for turning
 double left_angle=85.37;
 double right_angle=85.37;
-double s1min = 30; 
-double s2min = 30;
 double Ks = 1; // to reach the proper distance
-double Kps = 6; //to go straight, only affects right motor
+double kP = 6; //to go straight, only affects right motor
+const double turnTime = 1; //time for each turn.
 //Movement Values (Change here) ------------------------------------------------------------------------------------------------------------------------
 
 double targetTime = 60;
@@ -53,19 +49,19 @@ char movement[200] = "F30 B30 L R E ";
 
 
 
-//DRIVING -------------------------------------------------------------------------------------------------------------------
+//setup ================================================================================
 void setup() {
   delay(1000);
   turnSensorSetup();
   turnSensorReset();
-  
+  start_time = micros();
   
   buzzer.playFrequency(440, 200, 15);
   buzzer.playFrequency(440, 200, 15);
  
-delay(5000);
+  delay(5000);
 }
-
+//
 void update() {
   turnSensorUpdate();
   eCount= encoders.getCountsLeft();
@@ -81,19 +77,48 @@ void reset() {
 double dL(){return eCount / (CLICKS_PER_ROTATION * GEAR_RATIO) * WHEEL_CIRCUMFERENCE;}
 double dR(){return eCount2 / (CLICKS_PER_ROTATION * GEAR_RATIO) * WHEEL_CIRCUMFERENCE;}
 double vL(){
-  int vel = (dL()-ls0)/(micros()-lt0)*10000;
+  int vel = (dL()-ls0)/(micros()-lt0)*100000;
   ls0 = dL();
   lt0 = micros();
   return vel;
 }
 double vR(){
-  int vel = (dr()-rs0)/(micros()-rt0)*100000;
+  int vel = (dR()-rs0)/(micros()-rt0)*100000;  
   rs0 = dR();
   rt0 = micros();
   return vel;
 }
 
-void fwd(int intent) {
+void fwd(double distance) {
+  update();
+  double t0 = micros();
+  double delta_T = findTime(distance);
+  double vL_calc;
+  double vR_calc;
+  double left_pwm = pwm_min;
+  double right_pwm = pwm_min;
+  while ((micros()-t0)<= delta_T/4) {
+    left_pwm += kP * (16*distance/(3*pow(delta_T/100000,2))*(micros()-t0)/100000 - vL());
+    right_pwm += kP * (16*distance/(3*pow(delta_T/100000,2))*(micros()-t0)/100000 - vR());
+    motors.setSpeeds(left_pwm, right_pwm);
+  }
+  while ((micros()-t0)<= 3*delta_T/4) {
+    left_pwm += kP * (4*distance/(3*delta_T) - vL());
+    right_pwm += kP * (4*distance/(3*delta_T) - vR());
+    motors.setSpeeds(left_pwm, right_pwm);
+  }  
+  while(dL() < distance){
+    left_pwm += kP *( 4*distance/(3*delta_T) - 16*distance/(3*pow(delta_T/100000,2))*(micros()-t0)/100000- vL());
+    right_pwm += kP *( 4*distance/(3*delta_T) -16*distance/(3*pow(delta_T/100000,2))*(micros()-t0)/100000- vR());
+    motors.setSpeeds(left_pwm, right_pwm);
+  }
+    motors.setSpeeds(0, 0);
+    delay(300);
+    reset();
+}
+
+
+void back(double intent) {
   //debug
   //Serial.println("forward");
   update();
@@ -112,7 +137,7 @@ void left() {
   Serial.println("Turn Left");
   
   while (ang() < left_angle) {
-    motors.setSpeeds(-t1min - abs(left_angle - (ang())) * Kpt, t2min + abs(left_angle - (ang())) * Kpt);
+    motors.setSpeeds(-pwm_min - abs(left_angle - (ang())) * Kpt, pwm_min + abs(left_angle - (ang())) * Kpt);
   } 
     motors.setSpeeds(0,0);
     delay(250);
@@ -123,7 +148,7 @@ void right() {
  
   while (ang() > -right_angle) {  
     update();
-    motors.setSpeeds(t1min + abs(right_angle + (ang())) * Kpt, -t2min - abs(right_angle + (ang())) * Kpt);
+    motors.setSpeeds(pwm_min + abs(right_angle + (ang())) * Kpt, -pwm_min - abs(right_angle + (ang())) * Kpt);
   }   // -90 < fullTurn < 0
     motors.setSpeeds(0,0);
     delay(250);
@@ -134,6 +159,9 @@ void right() {
 
 void loop() {
 
+}
+double findTime(double distance){
+  return (targetTime - total_turns*turnTime) * (distance/total_distance) * 100000;
 }
 void calculateTotalDistance(const char* commands) {
   const char* ptr = commands;
@@ -149,6 +177,15 @@ void calculateTotalDistance(const char* commands) {
     } else {
       ptr++;
     }
+  }
+}
+void calculateTotalTurns(const char* commands) {
+  const char* ptr = commands;
+  while (*ptr != '\0') {
+    if (*ptr == 'L' || *ptr == 'R') {
+      total_turns++;
+    }
+    ptr++;
   }
 }
 

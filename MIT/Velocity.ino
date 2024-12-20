@@ -33,12 +33,12 @@ double vel1;
 double vel2;
 double total_turns=0;
 //turning
-double pwm_min = 35;
+double pwm_min = 25;
 double Kpt = 0.5; //for turning
 double left_angle=85.37;
 double right_angle=85.37;
-double kS = 0;
-double kP = 1; //to go straight, only affects right motor
+
+double kP = 0.1; //to go straight, only affects right motor
 const double turnTime = 500; //time for each turn in ms.
 //Movement Values (Change here) ------------------------------------------------------------------------------------------------------------------------
 
@@ -130,7 +130,7 @@ void fwd(double distance) {
     double velocity_error_R = velocity_setpoint - vR();
 
     left_pwm += kP * velocity_error_L;
-    right_pwm += kP * velocity_error_R + kS * ( vL()-vR());
+    right_pwm += kP * velocity_error_R;
 
     // Constrain PWM values to valid range
     left_pwm = constrain(left_pwm, pwm_min, 400);
@@ -174,8 +174,18 @@ void fwd(double distance) {
     reset();
 }
 
-
-
+*/
+void back(double intent) {
+  //debug
+  //Serial.println("forward");
+  update();
+  while (!(dL() >= intent/4)) {
+    update();
+  } 
+    motors.setSpeeds(0, 0);
+    delay(300);
+    reset();
+}
 void end() {
   update();
   double t0 = micros();
@@ -191,61 +201,6 @@ void end() {
   }
   motors.setSpeeds(0, 0);
   reset();
-}
-*/
-void end() {
-  update();
-  double distance = end_distance;
-  double t0 = micros(); // Start time in microseconds
-  double delta_T = targetTime - (micros() - start_time)/1e6;
-  double delta_T_us = delta_T * 1e6; // Convert delta_T from seconds to microseconds
-  double left_pwm = pwm_min;
-  double right_pwm = pwm_min;
-
-  double velocity_setpoint = 0; // Initialize the velocity setpoint
-  double elapsed_time;
-
-  // Main control loop
-  while (true) {
-    elapsed_time = micros() - t0; // Elapsed time in microseconds
-    update();
-    // Exit condition: Distance has been covered or time has exceeded delta_T
-    if (dL() >= distance || elapsed_time >= delta_T_us) {
-      break;
-    }
-
-    // Determine velocity setpoint based on elapsed time
-    if (elapsed_time <= delta_T_us / 4) {
-      // Acceleration phase
-      velocity_setpoint = (16.0 * distance) / (3.0 * delta_T * delta_T) * (elapsed_time / 1e6);
-    } else if (elapsed_time <= 3 * delta_T_us / 4) {
-      // Constant velocity phase
-      velocity_setpoint = (4.0 * distance) / (3.0 * delta_T);
-    } else {
-      // Deceleration phase
-      double t_dec = elapsed_time - 3 * delta_T_us / 4;
-      velocity_setpoint = (16.0 * distance) / (3.0 * delta_T * delta_T) * ((delta_T / 4) - t_dec / 1e6);
-    }
-
-    // Update PWM values based on velocity feedback and setpoint
-    double velocity_error_L = velocity_setpoint - vL();
-    double velocity_error_R = velocity_setpoint - vR();
-
-    left_pwm += kP * velocity_error_L;
-    right_pwm += kP * velocity_error_R + kS *( vL()-vR());
-
-    // Constrain PWM values to valid range
-    left_pwm = constrain(left_pwm, pwm_min, 400);
-    right_pwm = constrain(right_pwm, pwm_min, 400);
-
-    // Set motor speeds
-    motors.setSpeeds(left_pwm, right_pwm);
-  }
-
-  // Stop motors at the end
-  motors.setSpeeds(0, 0);
-  delay(50); // Small delay to ensure stop
-  reset();   // Reset necessary parameters
 }
 void left() {
   int starting = millis();
@@ -322,7 +277,7 @@ void processCommands(const char* commands) {
       if (cmd == 'F') {
         fwd(distance);
       } else {
-        fwd(-distance);
+        back(distance);
       }
     } else if (*ptr == 'L') {
       left();

@@ -15,7 +15,7 @@ const int CLICKS_PER_ROTATION = 12;
 const float GEAR_RATIO = 29.86F;
 const float WHEEL_DIAMETER = 3.2;
 const float WHEEL_CIRCUMFERENCE = 10.05; 
-const float BOT_RADIUS = 10; //cm horizontal radius(wheels to center)
+const float BOT_RADIUS = 4.25; //cm horizontal radius(wheels to center)
 
 uint32_t turnAngle = 0;
 int16_t turnRate;
@@ -31,19 +31,19 @@ volatile double eCount = 0;
 volatile double eCount2 = 0;
 double total_turns=0;
 //turning
-double pwm_min = 35;
-double Kpt = 0.75; //for turning
-double left_angle=85.37;
-double right_angle=85.37;
-
-double kP = 0.1; //to go straight, only affects right motor
-const double turnTime = 1000; //time for each turn in ms.
+double pwm_min = 27;
+double Kpt = 0.5; //for turning
+double left_angle=90;
+double right_angle=90;
+double kPs = 0.2; //to go straight, only affects right motor
+double kP = 0.4; 
+const double turnTime = 1500; //time for each turn in ms.
 //Movement Values (Change here) ------------------------------------------------------------------------------------------------------------------------
 
-double targetTime = 6;
+double targetTime = 60;
 double end_distance = 50;
 
-char movement[200] = "F50 B50 L E";
+char movement[200] = "F35 R F50 L F100 R F50 L F50 B50 L F200 L F100 L F50 L F150 R F100 R F150 L F50 L F50 B50 L F50 R F150 L F50 E";
 
 
 
@@ -128,7 +128,7 @@ void fwd(double distance) {
     double velocity_error_R = velocity_setpoint - vR();
 
     left_pwm += kP * velocity_error_L;
-    right_pwm += kP * velocity_error_R;
+    right_pwm += kP * velocity_error_R -  kPs * ang();
 
     // Constrain PWM values to valid range
     left_pwm = constrain(left_pwm, pwm_min, 400);
@@ -196,9 +196,9 @@ void back(double distance) {
   reset();   // Reset necessary parameters
 }
 
-void end() {
+void end(double d) {
   update();
-  double distance = end_distance;
+  double distance = end_distance + d;
   double t0 = micros(); // Start time in microseconds
   double delta_T = ((targetTime *1e6 + start_time) - t0)/1e6; 
   double delta_T_us = delta_T * 1e6; // Convert delta_T from seconds to microseconds
@@ -232,7 +232,7 @@ void end() {
 
     // Update PWM values based on velocity feedback and setpoint
     double velocity_error_L = velocity_setpoint - vL();
-    double velocity_error_R = velocity_setpoint - vR();
+    double velocity_error_R = velocity_setpoint - vR() -  kPs * ang();
 
     left_pwm += kP * velocity_error_L;
     right_pwm += kP * velocity_error_R;
@@ -325,8 +325,8 @@ void calculateTotalTurns(const char* commands) {
 
 void processCommands(const char* commands) {
   const char* ptr = commands; // Pointer to traverse the char array
-  bool previousTurn = false;  // Flag to track if the previous command was a turn
-
+   // Flag to track if the previous command was a turn
+  bool previousBack=false;
   while (*ptr != '\0') { // Loop until null terminator
     if (*ptr == 'F' || *ptr == 'B') {
       char cmd = *ptr; // Store the command ('F' or 'B')
@@ -347,42 +347,39 @@ void processCommands(const char* commands) {
         ptr++;
       }
 
-      bool nextTurn = (*ptr == 'L' || *ptr == 'R'); // Check if the next command is a turn
+      distance -= 2 * BOT_RADIUS; // Subtract BOT_RADIUS if there was a turn before
 
-      if (previousTurn) {
-        distance -= BOT_RADIUS; // Subtract rad_1 if there was a turn before
-      }
-      if (nextTurn) {
-        distance -= BOT_RADIUS; // Subtract rad_1 if there is a turn after
-      }
-
+      
+      
       // Ensure distance is non-negative
-      if (distance < 0) {
-        distance = 0;
-      }
-
       if (cmd == 'F') {
         fwd(distance);
+        previousBack=true;
       } else {
+        if(previousBack){
+          distance += 2* BOT_RADIUS;
+        }
         back(distance);
+        previousBack = false;
       }
-
-      previousTurn = nextTurn; // Update the flag for the next iteration
     } else if (*ptr == 'L') {
       left();
       ptr++;
-      previousTurn = true;
+      previousBack=false;
     } else if (*ptr == 'R') {
       right();
       ptr++;
-      previousTurn = true;
+      previousBack=false;
     } else if (*ptr == 'E') {
-      end();
+      if(previousBack){
+        end(2* BOT_RADIUS);
+      }
+      end(0);
       ptr++;
-      previousTurn = false;
+      previousBack=false;
     } else {
       ptr++; // Skip unrecognized characters
-      previousTurn = false;
+     
     }
   }
 }

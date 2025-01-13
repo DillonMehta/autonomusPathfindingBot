@@ -42,7 +42,7 @@ const double turnTime = 1500; //time for each turn in ms.
 
 double targetTime = 60;
 double end_distance = 50;
-
+double end_delay = 1000;
 char movement[200] = "F35 R F50 L F100 R F50 L F50 B50 L F200 L F100 L F50 L F150 R F100 R F150 L F50 L F50 B50 L F50 R F150 L F50 E";
 
 
@@ -198,6 +198,7 @@ void back(double distance) {
 
 void end(double d) {
   update();
+  delay(end_delay);
   double distance = end_distance + d;
   double t0 = micros(); // Start time in microseconds
   double delta_T = ((targetTime *1e6 + start_time) - t0)/1e6; 
@@ -353,6 +354,9 @@ void processCommands(const char* commands) {
       
       // Ensure distance is non-negative
       if (cmd == 'F') {
+        if(previousBack){
+          distance += 2* BOT_RADIUS;
+        }
         fwd(distance);
         previousBack=true;
       } else {

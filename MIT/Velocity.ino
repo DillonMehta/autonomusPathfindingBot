@@ -15,7 +15,7 @@ const int CLICKS_PER_ROTATION = 12;
 const float GEAR_RATIO = 29.86F;
 const float WHEEL_DIAMETER = 3.2;
 const float WHEEL_CIRCUMFERENCE = 10.05; 
-const float BOT_RADIUS = 4.25; //cm horizontal radius(wheels to center)
+// This constant represents a turn of 90 degrees.
 
 uint32_t turnAngle = 0;
 int16_t turnRate;
@@ -29,21 +29,23 @@ double start_time;
 double total_distance;
 volatile double eCount = 0;
 volatile double eCount2 = 0;
+double vel1;
+double vel2;
 double total_turns=0;
 //turning
-double pwm_min = 25;
-double Kpt = 1.2; //for turning
-double left_angle=88.7;
-double right_angle=88.7;
-double kPs = 0.025; //to go straight, only affects right motor
-double kP = 0.1; 
+double pwm_min = 35;
+double Kpt = 0.75; //for turning
+double left_angle=85.37;
+double right_angle=85.37;
+
+double kP = 0.1; //to go straight, only affects right motor
 const double turnTime = 1000; //time for each turn in ms.
 //Movement Values (Change here) ------------------------------------------------------------------------------------------------------------------------
 
-double targetTime = 60;
-double end_distance = 45;
-double end_delay = 0;
-char movement[200] = "F35 R F50 L F100 R F50 L F50 B50 L F200 L F100 L F50 L F150 R F100 R F150 L F50 L F50 B50 L F50 R F150 L F50 E";
+double targetTime = 6;
+double end_distance = 50;
+
+char movement[200] = "F50 B50 L E";
 
 
 
@@ -128,7 +130,7 @@ void fwd(double distance) {
     double velocity_error_R = velocity_setpoint - vR();
 
     left_pwm += kP * velocity_error_L;
-    right_pwm += kP * velocity_error_R -  kPs * ang();
+    right_pwm += kP * velocity_error_R;
 
     // Constrain PWM values to valid range
     left_pwm = constrain(left_pwm, pwm_min, 400);
@@ -158,7 +160,7 @@ void back(double distance) {
     elapsed_time = micros() - t0; // Elapsed time in microseconds
     update();
     // Exit condition: Distance has been covered or time has exceeded delta_T
-    if (dL() >= distance || elapsed_time >= delta_T_us +1e5) {
+    if (dL() >= distance || elapsed_time >= delta_T_us) {
       break;
     }
 
@@ -177,7 +179,7 @@ void back(double distance) {
 
     // Update PWM values based on velocity feedback and setpoint (negative for backward motion)
     double velocity_error_L = -velocity_setpoint - vL();
-    double velocity_error_R = -velocity_setpoint - vR() -  kPs * ang();
+    double velocity_error_R = -velocity_setpoint - vR();
 
     left_pwm += kP * velocity_error_L;
     right_pwm += kP * velocity_error_R;
@@ -196,10 +198,9 @@ void back(double distance) {
   reset();   // Reset necessary parameters
 }
 
-void end(double d) {
+void end() {
   update();
- 
-  double distance = end_distance + d;
+  double distance = end_distance;
   double t0 = micros(); // Start time in microseconds
   double delta_T = ((targetTime *1e6 + start_time) - t0)/1e6; 
   double delta_T_us = delta_T * 1e6; // Convert delta_T from seconds to microseconds
@@ -210,7 +211,6 @@ void end(double d) {
   double elapsed_time;
 
   // Main control loop
-  // Main control loop
   while (true) {
     elapsed_time = micros() - t0; // Elapsed time in microseconds
     update();
@@ -220,14 +220,24 @@ void end(double d) {
     }
 
     // Determine velocity setpoint based on elapsed time
-    velocity_setpoint = distance/delta_T;
+    if (elapsed_time <= delta_T_us / 4) {
+      // Acceleration phase
+      velocity_setpoint = (16.0 * distance) / (3.0 * delta_T * delta_T) * (elapsed_time / 1e6);
+    } else if (elapsed_time <= 3 * delta_T_us / 4) {
+      // Constant velocity phase
+      velocity_setpoint = (4.0 * distance) / (3.0 * delta_T);
+    } else {
+      // Deceleration phase
+      double t_dec = elapsed_time - 3 * delta_T_us / 4;
+      velocity_setpoint = (16.0 * distance) / (3.0 * delta_T * delta_T) * ((delta_T / 4) - t_dec / 1e6);
+    }
 
     // Update PWM values based on velocity feedback and setpoint
     double velocity_error_L = velocity_setpoint - vL();
     double velocity_error_R = velocity_setpoint - vR();
 
     left_pwm += kP * velocity_error_L;
-    right_pwm += kP * velocity_error_R -  kPs * ang();
+    right_pwm += kP * velocity_error_R;
 
     // Constrain PWM values to valid range
     left_pwm = constrain(left_pwm, pwm_min, 400);
@@ -236,7 +246,6 @@ void end(double d) {
     // Set motor speeds
     motors.setSpeeds(left_pwm, right_pwm);
   }
-
   // Stop motors at the end
   motors.setSpeeds(0, 0);
   delay(10); // Small delay to ensure stop
@@ -247,7 +256,7 @@ void left() {
   delay(100);
   while (ang() < left_angle) {
     update();
-    motors.setSpeeds(0, pwm_min + abs(left_angle - (ang())) * Kpt);
+    motors.setSpeeds(-pwm_min - abs(left_angle - (ang())) * Kpt, pwm_min + abs(left_angle - (ang())) * Kpt);
   }
   motors.setSpeeds(0,0);
   while(millis() - starting < turnTime){
@@ -261,7 +270,7 @@ void right() {
   delay(100);
   while (ang() > -right_angle) {  
     update();
-    motors.setSpeeds(pwm_min + abs(right_angle + (ang())) * Kpt, 0);
+    motors.setSpeeds(pwm_min + abs(right_angle + (ang())) * Kpt, -pwm_min - abs(right_angle + (ang())) * Kpt);
   }   // -90 < fullTurn < 0
   motors.setSpeeds(0,0);
   while(millis() - starting < turnTime){
@@ -276,26 +285,16 @@ void loop() {
 
 }
 double findTime(double distance){
-  return (targetTime - total_turns*turnTime/1e3 -2) * (distance/total_distance); //seconds
+  return (targetTime - total_turns*turnTime/1e3) * (distance/total_distance); //seconds
 }
 void calculateTotalDistance(const char* commands) {
   const char* ptr = commands;
   while (*ptr != '\0') {
     if (*ptr == 'F' || *ptr == 'B') {
       ptr++;
-      float distance = 0.0;
-      float factor = 1.0;
-      bool isDecimal = false;
-      while ((*ptr >= '0' && *ptr <= '9') || *ptr == '.') {
-        if (*ptr == '.') {
-          isDecimal = true;
-          factor = 0.1;
-        } else if (!isDecimal) {
-          distance = distance * 10 + (*ptr - '0');
-        } else {
-          distance += (*ptr - '0') * factor;
-          factor *= 0.1;
-        }
+      int distance = 0;
+      while (*ptr >= '0' && *ptr <= '9') {
+        distance = distance * 10 + (*ptr - '0');
         ptr++;
       }
       total_distance += distance;
@@ -304,7 +303,6 @@ void calculateTotalDistance(const char* commands) {
     }
   }
   total_distance += end_distance;
-  total_distance -= total_turns * 2 * BOT_RADIUS;
 }
 void calculateTotalTurns(const char* commands) {
   const char* ptr = commands;
@@ -318,67 +316,35 @@ void calculateTotalTurns(const char* commands) {
 
 void processCommands(const char* commands) {
   const char* ptr = commands; // Pointer to traverse the char array
-   // Flag to track if the previous command was a turn
-  bool previousBack=false;
   while (*ptr != '\0') { // Loop until null terminator
     if (*ptr == 'F' || *ptr == 'B') {
       char cmd = *ptr; // Store the command ('F' or 'B')
       ptr++; // Move to the number part
-      float distance = 0.0;
-      float factor = 1.0;
-      bool isDecimal = false;
-      while ((*ptr >= '0' && *ptr <= '9') || *ptr == '.') { // Extract number
-        if (*ptr == '.') {
-          isDecimal = true;
-          factor = 0.1;
-        } else if (!isDecimal) {
-          distance = distance * 10 + (*ptr - '0');
-        } else {
-          distance += (*ptr - '0') * factor;
-          factor *= 0.1;
-        }
+      int distance = 0;
+      while (*ptr >= '0' && *ptr <= '9') { // Extract number
+        distance = distance * 10 + (*ptr - '0');
         ptr++;
       }
-
-      distance -= 2 * BOT_RADIUS; // Subtract BOT_RADIUS if there was a turn before
-
-      
-      
-      // Ensure distance is non-negative
       if (cmd == 'F') {
-        if(previousBack){
-          distance += 2* BOT_RADIUS;
-        }
         fwd(distance);
-        previousBack=true;
       } else {
-        if(previousBack){
-          distance += 2* BOT_RADIUS;
-        }
         back(distance);
-        previousBack = false;
       }
     } else if (*ptr == 'L') {
       left();
       ptr++;
-      previousBack=false;
     } else if (*ptr == 'R') {
       right();
       ptr++;
-      previousBack=false;
     } else if (*ptr == 'E') {
-      if(previousBack){
-        end(2* BOT_RADIUS);
-      }
-      end(0);
+      end();
       ptr++;
-      previousBack=false;
     } else {
       ptr++; // Skip unrecognized characters
-     
     }
   }
 }
+
 //Pololu included gyro stuff
 
 // This should be called to set the starting point for measuring

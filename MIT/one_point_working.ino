@@ -201,7 +201,7 @@ void fwd(double distance) {
     update();
 
 
-    if (dL() >= distance) {
+    if (dR() >= distance) {
       break;
     }
 
@@ -364,25 +364,21 @@ void left() {
     motors.setSpeeds(-pwm_min - abs(90 - (ang())) * Kpt, pwm_min + abs(90 - (ang())) * Kpt);
   }
   motors.setSpeeds(0, 0);
-  while (millis() - starting < turnTime) {
-    motors.setSpeeds(0, 0);
-  }
+  delay(turnTime -(millis() - starting));
   reset();
 }
 
 
 void right() {
+  reset();
   int starting = millis();
   delay(250);
-  reset();
   while (ang() > -right_angle) {
     update();
     motors.setSpeeds(pwm_min + abs(90 + (ang())) * Kpt, -pwm_min - abs(90 + (ang())) * Kpt);
   }
   motors.setSpeeds(0, 0);
-  while (millis() - starting < turnTime) {
-    motors.setSpeeds(0, 0);
-  }
+  delay(turnTime -(millis() - starting));
   reset();
 }
 
@@ -537,8 +533,8 @@ void processCommands(const char* commands)
         // parse angle
         float deg = parseNumber(ptr);
         // do new time-based turning
-        if (turnCmd == 'L') leftTime(deg);
-        else                rightTime(deg);
+        if (turnCmd == 'L') left();
+        else                right();
       }
     }
     // -------------------------------------------------

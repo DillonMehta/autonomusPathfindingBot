@@ -238,7 +238,7 @@ void fwd(double distance) {
 
   // Stop
   motors.setSpeeds(0, 0);
-  delay(10);
+  delay(50);
   reset();
 }
 
@@ -263,7 +263,7 @@ void back(double distance) {
     update();
 
 
-    if (dR() < -distance) {
+    if (dL() < -distance) {
       break;
     }
 
@@ -310,8 +310,8 @@ void end(double d) {
   double delta_T_us = delta_T * 1e6;
 
 
-  double left_pwm   = pwm_min;
-  double right_pwm  = pwm_min;
+  double left_pwm   = str_min;
+  double right_pwm  = str_min;
   double velocity_setpoint = 0;
   double elapsed_time;
 
@@ -325,8 +325,11 @@ void end(double d) {
       break;
     }
 
-
-    velocity_setpoint = (distance-dL()) / (delta_T-elapsed_time/1e6);
+    if(delta_t > 0){
+      velocity_setpoint = (distance-dL()) / (delta_T-elapsed_time/1e6);
+    }else{
+      velocity_setpoint = 40;
+    }
     double velocity_error_L = velocity_setpoint - vL();
     double velocity_error_R = velocity_setpoint - vR();
 

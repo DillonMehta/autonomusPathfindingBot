@@ -43,7 +43,7 @@ double total_turns     = 0;
 
 // slow turns
 
-const double pwm_min     = 35;     // minimal PWM for movement
+const double pwm_min     = 45;     // minimal PWM for movement
 double Kpt         = 0.6;    // proportional factor for turning
 double left_angle  = 85.8;   // approx. “normal” left turn angle
 double right_angle = 85.8;   // approx. “normal” right turn angle
@@ -53,7 +53,7 @@ const double turnTime = 1500;
 //straight
 double kPs = 0.05;          // small angle correction for going straight
 double kP  = 0.1;            // for velocity control
-double str_min = 50;
+double str_min = 60;
 
 
 // Movement Values (Change here) ------------------------------------------------------------------------------------------------
@@ -325,7 +325,7 @@ void end(double d) {
       break;
     }
 
-    if(delta_t > 0){
+    if(delta_T > 0){
       velocity_setpoint = (distance-dL()) / (delta_T-elapsed_time/1e6);
     }else{
       velocity_setpoint = 40;

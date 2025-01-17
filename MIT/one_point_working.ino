@@ -22,7 +22,7 @@ const int   CLICKS_PER_ROTATION = 12;
 const float GEAR_RATIO          = 29.86F;
 const float WHEEL_DIAMETER      = 3.2;
 const float WHEEL_CIRCUMFERENCE = 10.25;
-const float BOT_RADIUS          = 4.4; // cm horizontal radius (wheels to center)
+const float BOT_RADIUS          = 4.3; // cm horizontal radius (wheels to center)
 
 
 // Global variables for gyro-based turning
@@ -42,36 +42,27 @@ double total_turns     = 0;
 
 
 // slow turns
-/*
-double pwm_min     = 35;     // minimal PWM for movement
-double Kpt         = 0.15;    // proportional factor for turning
-double left_angle  = 85.8;   // approx. “normal” left turn angle
-double right_angle = 85.8;   // approx. “normal” right turn angle
-const double turnTime = 1000;
- */
-// fast turns
 
-double pwm_min     = 35;     // minimal PWM for movement
+const double pwm_min     = 35;     // minimal PWM for movement
 double Kpt         = 0.6;    // proportional factor for turning
 double left_angle  = 85.8;   // approx. “normal” left turn angle
 double right_angle = 85.8;   // approx. “normal” right turn angle
-const double turnTime = 600;
+const double turnTime = 1500;
 
 
 //straight
-double kPs = 0.1;          // small angle correction for going straight
+double kPs = 0.05;          // small angle correction for going straight
 double kP  = 0.1;            // for velocity control
 double str_min = 50;
 
 
 // Movement Values (Change here) ------------------------------------------------------------------------------------------------
-double targetTime   = 3;
-double end_distance = 0;   // distance in cm to move when "end"
+double targetTime   = 60;
+double end_distance = 44.7 + 50;   // distance in cm to move when "end"
 double end_delay    = 0;    // not currently used
 
 // Example movement array
-char movement[200] = "L L L L L L L L L L L L L L L L";
-//"F30.3 R F50 L F100 R F50 L F50 B50 L F200 L F100 L F50 L F150 R F100 R F150 L F50 L F50 B50 L F50 R F150 L90 E";
+char movement[200] = "F30.3 R F50 L F100 R F50 L F50 B50 L F200 L F100 L F50 L F150 R F100 R F150 L F50 L F50 B50 L F50 R F150 L E";
 
 
 // -------------------------------------------------------------------------------------------------
@@ -173,7 +164,7 @@ double dL() {
   return eCount / (CLICKS_PER_ROTATION * GEAR_RATIO) * WHEEL_CIRCUMFERENCE; 
 }
 double dR() {
-  return eCount2 / (CLICKS_PER_ROTATION * GEAR_RATIO) * (WHEEL_CIRCUMFERENCE -0.018);
+  return eCount2 / (CLICKS_PER_ROTATION * GEAR_RATIO) * (WHEEL_CIRCUMFERENCE -0.02);
 }
 double vL() {
   double vel = (dL() - ls0) / (micros() - lt0) * 1000000;
@@ -363,8 +354,8 @@ void end(double d) {
 // -------------------------------------------------------------------------------------------------
 void left() {
   int starting = millis();
-  delay(150);
-  update();
+  delay(250);
+  reset();
   while (ang() < left_angle) {
     update();
     motors.setSpeeds(-pwm_min - abs(90 - (ang())) * Kpt, pwm_min + abs(90 - (ang())) * Kpt);
@@ -379,8 +370,8 @@ void left() {
 
 void right() {
   int starting = millis();
-  delay(100);
-  update();
+  delay(250);
+  reset();
   while (ang() > -right_angle) {
     update();
     motors.setSpeeds(pwm_min + abs(90 + (ang())) * Kpt, -pwm_min - abs(90 + (ang())) * Kpt);
@@ -579,7 +570,7 @@ void processCommands(const char* commands)
 double findTime(double distance)
 {
   // You can refine if you want, but here is your existing approach
-  return (targetTime - total_turns * turnTime / 1e3) * (distance / total_distance);
+  return (targetTime - total_turns * turnTime / 1e3 - 1) * (distance / total_distance);
 }
 
 

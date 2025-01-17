@@ -43,11 +43,12 @@ double total_turns     = 0;
 
 // slow turns
 
-const double pwm_min     = 25;     // minimal PWM for movement
+const double pwm_min     = 0;     // minimal PWM for movement
+const float w_min = 20;
 double Kpt         = 0.1;    // proportional factor for turning
 double left_angle  = 85.8;   // approx. “normal” left turn angle
 double right_angle = 85.8;   // approx. “normal” right turn angle
-const double turnTime = 2500;
+const double turnTime = 1000;
 
 
 //straight
@@ -79,8 +80,8 @@ void setup() {
 
 
   // A couple of beeps:
-  buzzer.playFrequency(440, 200, 15);
-  buzzer.playFrequency(440, 200, 15);
+  //buzzer.playFrequency(440, 200, 15);
+  //buzzer.playFrequency(440, 200, 15);
 
 
   // Process the command array
@@ -88,8 +89,8 @@ void setup() {
 
 
   // Another beep or two:
-  buzzer.playFrequency(440, 200, 15);
-  buzzer.playFrequency(440, 200, 15);
+  //buzzer.playFrequency(440, 200, 15);
+  //buzzer.playFrequency(440, 200, 15);
 
 
   delay(5000);
@@ -344,20 +345,20 @@ void left() {
   delay(250);
   reset();
   double t0         = micros();
-  double delta_T    =  turnTime - 500;
-  double delta_T_us = delta_T * 1e6;
-
+  double tf    =  (turnTime -500)/1e3;
+  double tf_us = tf * 1e6;
+  float w_max = 2 * (left_angle/tf - w_min);
 
   double left_pwm   = -pwm_min;
   double right_pwm  = pwm_min;
 
-
+  double velocity_error;
   double velocity_setpoint = 0;
-  double elapsed_time;
+  double t;
 
 
   while (true) {
-    elapsed_time = micros() - t0;
+    t = micros() - t0;
     update();
 
 
@@ -366,22 +367,16 @@ void left() {
     }
 
 
-    if (elapsed_time <= delta_T_us / 4.0) {
-      velocity_setpoint = (16.0 * left_angle) / (3.0 * delta_T * delta_T)  * (elapsed_time / 1e6);
-    } else if (elapsed_time <= 3.0 * delta_T_us / 4.0) {
-      velocity_setpoint = (4.0 * left_angle) / (3.0 * delta_T);
-    } else {
-      double t_dec = elapsed_time - 3.0 * delta_T_us / 4.0;
-      velocity_setpoint = (16.0 * left_angle) / (3.0 * delta_T * delta_T) * ((delta_T / 4.0) - t_dec / 1e6);
-    }
+   if(t < tf/2){
+    velocity_setpoint = 0.5 * (w_max - w_min)/tf * t/1e6 + w_min; 
+   }else{
+    velocity_setpoint = 0.5 * (w_min - w_max)/tf * t/1e6 + w_min; 
+   }
+    velocity_error = velocity_setpoint - aV();
 
 
-    double velocity_error_L = -velocity_setpoint - aV();
-    double velocity_error_R = velocity_setpoint - aV();
-
-
-    left_pwm  += Kpt * velocity_error_L;
-    right_pwm += Kpt * velocity_error_R;
+    left_pwm  += Kpt * -velocity_error;
+    right_pwm += Kpt * velocity_error;
 
 
     left_pwm  = constrain(left_pwm,  -300, -pwm_min);

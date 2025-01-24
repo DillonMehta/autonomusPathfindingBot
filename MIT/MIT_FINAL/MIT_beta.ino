@@ -1,6 +1,3 @@
-//changed end function logic
-//now it turns, adds extra distance to dist, and choses either trapezoid or rectangle forward based on remaining time. 
-
 //Includes ------------------------------------------------------------------------------------------------------------------------
 #include <Wire.h>
 #include <Pololu3piPlus32U4.h>
@@ -18,7 +15,7 @@ const int CLICKS_PER_ROTATION = 12;
 const float GEAR_RATIO = 29.86F;
 const float WHEEL_DIAMETER = 3.2;
 const float WHEEL_CIRCUMFERENCE = 10.25; 
-const float BOT_RADIUS = 4.21; //cm horizontal radius(wheels to center)
+const float BOT_RADIUS = 4.242; //cm horizontal radius(wheels to center)
 
 // Global variables for gyro-based turning
 uint32_t turnAngle     = 0;
@@ -42,11 +39,11 @@ const double pwm_min     = 35;     // minimal PWM for movement
 double Kpt         = 1;    // proportional factor for turning
 double left_angle  = 90;   // approx. “normal” left turn angle
 double right_angle = 90 ;   // approx. “normal” right turn angle
-const double turnTime = 1500;
+const double turnTime = 1000;
 
 
 //straight
-double kPs = 0.2;          // small angle correction for going straight
+double kPs = 0.0;          // small angle correction for going straight
 double kP  = 0.4;            // for velocity control
 double str_min = 60;
 
@@ -56,14 +53,15 @@ double delayer_amt;
 
 //Movement Values (Change here) ------------------------------------------------------------------------------------------------------------------------
 
-double targetTime = 65;//subtract 1.75 seconds for every 50cm the end has, including the dist_diff
-double end_distance = 45;
+double targetTime = 2.5;//subtract 1.75 seconds for every 50cm the end has, including the dist_diff
+double end_distance = 50; //
 double end_delay = 0;
 double time_diff=0;//seconds
 double ang_diff=0;//left is positive
 double dist_diff=0;//forwawrd is positive
 
-char movement[200] = "F35 R F50 L F100 R F50 L T L F200 L F100 L F50 L F150 R F100 R F150 L F50 L T L F50 R F150 L E";
+//35 is enter
+char movement[200] = "F150";
 
 
 
@@ -115,7 +113,7 @@ double vR(){
 void fwd(double distance) {
   update();
   double t0 = micros(); // Start time in microseconds
-  double delta_T = findTime(distance);
+  double delta_T = findTime(distance); * 0.8;
   double delta_T_us = delta_T * 1e6; // Convert delta_T from seconds to microseconds
   double left_pwm = str_min;
   double right_pwm = str_min;
@@ -219,32 +217,18 @@ void back(double distance) {
 }
 
 void end(double d) {
-  if (ang_diff>0){
-    delay(100);
-    while (ang() < ang_diff) {
-      update();
-      motors.setSpeeds(-pwm_min - abs(ang_diff - (ang())) * Kpt, pwm_min + abs(ang_diff - (ang())) * Kpt);
-    }
-  }else if (ang_diff<0){
-    delay(100);
-    while (ang() > -ang_diff) {  
-      update();
-      motors.setSpeeds(pwm_min + abs(ang_diff + (ang())) * Kpt, -pwm_min - abs(ang_diff + (ang())) * Kpt);
-    }
-    
-  }
   motors.setSpeeds(0,0);
   reset();
   delay(100);
-  double distance   = end_distance + d + dist_diff;
+  double distance   = end_distance + d;
   double t0         = micros();
   double delta_T = ((targetTime *1e6 + start_time) - t0) / 1e6;
   double delta_T_us = delta_T * 1e6;
   if(findTime(d) > delta_T){
     fwd(distance);
   }else{
-    double left_pwm   = str_min;
-    double right_pwm  = str_min;
+    double left_pwm   = pwm_min;
+    double right_pwm  = pwm_min;
     double velocity_setpoint = (distance) / (delta_T);
     double elapsed_time;
     
@@ -266,7 +250,24 @@ void end(double d) {
       motors.setSpeeds(left_pwm, right_pwm);
     }
   }
-  
+  motors.setSpeeds(0,0);
+  if (ang_diff>0){
+    delay(100);
+    while (ang() < ang_diff) {
+      update();
+      motors.setSpeeds(-pwm_min - abs(ang_diff - (ang())) * Kpt, pwm_min + abs(ang_diff - (ang())) * Kpt);
+    }
+  }else if (ang_diff<0){
+    delay(100);
+    while (ang() > -ang_diff) {  
+      update();
+      motors.setSpeeds(pwm_min + abs(ang_diff + (ang())) * Kpt, -pwm_min - abs(ang_diff + (ang())) * Kpt);
+    }
+  }
+  fwd(dist_diff);
+  display.clear();
+  display.print(dL(),2);
+  delay(500);
   display.clear();
   display.print((micros()-start_time)/1e6,2);
 }
@@ -400,8 +401,8 @@ void processCommands(const char* commands) {
         previousBack = false;
       }
     } else if (*ptr == 'T') {
-        fwd(35-2*BOT_RADIUS);
-        back(35);
+        fwd(40-2*BOT_RADIUS);
+        back(40);
         ptr++;
         previousBack=false;
     } else if (*ptr == 'S') {
@@ -419,7 +420,7 @@ void processCommands(const char* commands) {
       previousBack=false;
     } else if (*ptr == 'E') {
       if(previousBack){
-        end(2* BOT_RADIUS);
+        end(0);
       }
       end(0);
       ptr++;

@@ -301,13 +301,15 @@ void curveTurn(bool dir){
   double t0 = micros(); // Start time in microseconds
   double delta_T = turnTime;
   double delta_T_us = delta_T * 1e3; // Convert delta_T from seconds to microseconds
+  double left_pwm;
+  double right_pwm;
   if(dir){
-    double left_pwm = str_min;
-    double right_pwm = str_min*1/ratio;
+    left_pwm = str_min;
+    right_pwm = str_min*1/ratio;
   }
   else{
-    double right_pwm = str_min;
-    double left_pwm = str_min*1/ratio;
+    right_pwm = str_min;
+    left_pwm = str_min*1/ratio;
   }
 
   double velocity_setpoint = 0; // Initialize the velocity setpoint

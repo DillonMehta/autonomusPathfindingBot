@@ -248,19 +248,46 @@ void end(double d)
   display.print((micros() - start_time) / 1e6, 2);
 }
 
-void back(double distance)
-{
-  int starting = millis();
+void back(double distance) {
   update();
-  delay(200);
-  while (-dL() + dR() < BOT_RADIUS * 3.14159 * 2)
-  {
+  double t0 = micros();
+  double delta_T = findTime(distance);
+  double delta_T_us = delta_T * 1e6;
+  double left_pwm = -str_min;
+  double right_pwm = -str_min;
+  double velocity_setpoint = 0;
+  double elapsed_time;
+
+  while (true) {
+    elapsed_time = micros() - t0;
     update();
-    motors.setSpeeds(-pwm_min, pwm_min);
+    if (-dL() >= distance) {
+      break;
+    }
+
+    if (elapsed_time <= delta_T_us / 4) {
+      velocity_setpoint = - (16.0 * distance) / (3.0 * delta_T * delta_T) * (elapsed_time / 1e6);
+    } else if (elapsed_time <= 3 * delta_T_us / 4) {
+      velocity_setpoint = - (4.0 * distance) / (3.0 * delta_T);
+    } else {
+      double t_dec = elapsed_time - 3 * delta_T_us / 4;
+      velocity_setpoint = - (16.0 * distance) / (3.0 * delta_T * delta_T) * ((delta_T / 4) - t_dec / 1e6);
+    }
+
+    double velocity_error_L = velocity_setpoint - vL();
+    double velocity_error_R = velocity_setpoint - vR();
+
+    left_pwm += kP * velocity_error_L;
+    right_pwm += kP * velocity_error_R;
+
+    left_pwm = constrain(left_pwm, -400, -str_min);
+    right_pwm = constrain(right_pwm, -400, -str_min);
+    right_pwm -= kPs * ang();
+    motors.setSpeeds(left_pwm, right_pwm);
   }
+
   motors.setSpeeds(0, 0);
-  // delay(turnTime > (millis() - starting) ? turnTime - (millis() - starting) + 150: 150);
-  delay(200);
+  delay(10 + delayer_amt);
   reset();
 }
 //true is left, false is right
@@ -452,192 +479,128 @@ void calculateTotalFwd(const char *commands)
   }
 }
 
-void processCommands(const char *commands)
-{
-  const char *ptr = commands; // Pointer to traverse the char array
-                              // Flag to track if the previous command was a turn
-  bool previousBack = false;
-  while (*ptr != '\0')
-  { // Loop until null terminator
-    if (*ptr == 'F' || *ptr == 'B')
-    {
+void processCommands(const char* commands) {
+  const char* ptr = commands; // Pointer to traverse the char array
+   // Flag to track if the previous command was a turn
+  while (*ptr != '\0') { // Loop until null terminator
+    if (*ptr == 'F' || *ptr == 'B') {
       char cmd = *ptr; // Store the command ('F' or 'B')
-      ptr++;           // Move to the number part
+      ptr++; // Move to the number part
       float distance = 0.0;
       float factor = 1.0;
       bool isDecimal = false;
-      while ((*ptr >= '0' && *ptr <= '9') || *ptr == '.')
-      { // Extract number
-        if (*ptr == '.')
-        {
+      while ((*ptr >= '0' && *ptr <= '9') || *ptr == '.') { // Extract number
+        if (*ptr == '.') {
           isDecimal = true;
           factor = 0.1;
-        }
-        else if (!isDecimal)
-        {
+        } else if (!isDecimal) {
           distance = distance * 10 + (*ptr - '0');
-        }
-        else
-        {
+        } else {
           distance += (*ptr - '0') * factor;
           factor *= 0.1;
         }
         ptr++;
       }
 
-      // distance -= 2 * BOT_RADIUS; // Subtract BOT_RADIUS if there was a turn before
 
+      //distance -= 2 * BOT_RADIUS; // Subtract BOT_RADIUS if there was a turn before
+
+
+     
+     
       // Ensure distance is non-negative
-      if (cmd == 'F')
-      {
-        if (previousBack)
-        {
-          distance += 2 * BOT_RADIUS;
-        }
+      if (cmd == 'F') {
+
         fwd(distance);
-        // previousBack=true;
-      }
-      else
-      {
-        if (previousBack)
-        {
-          distance += 2 * BOT_RADIUS;
-        }
+
+      } else {
+
         back(distance);
-        previousBack = false;
+
       }
-    }
-    else if (*ptr == 'B')
-    {
-      back(35);
-      ptr++;
-      previousBack = false;
-    }
-    else if (*ptr == 'L')
-    {
+    } else if (*ptr == 'L') {
       ptr++;
       float turn_angs = 0.0;
       float factor = 1.0;
       bool isDecimal = false;
-      while ((*ptr >= '0' && *ptr <= '9') || *ptr == '.')
-      { // Extract number
-        if (*ptr == '.')
-        {
+      while ((*ptr >= '0' && *ptr <= '9') || *ptr == '.') { // Extract number
+        if (*ptr == '.') {
           isDecimal = true;
           factor = 0.1;
-        }
-        else if (!isDecimal)
-        {
+        } else if (!isDecimal) {
           turn_angs = turn_angs * 10 + (*ptr - '0');
-        }
-        else
-        {
+        } else {
           turn_angs += (*ptr - '0') * factor;
           factor *= 0.1;
         }
         ptr++;
       }
-      if (turn_angs == 0)
-      {
+      if (turn_angs==0){
         left();
-      }
-      else
-      {
+      }else{
         left(turn_angs);
       }
       ptr++;
-      previousBack = false;
-    }
-    else if (*ptr == 'R')
-    {
+
+    } else if (*ptr == 'R') {
       ptr++;
       float turn_angs = 0.0;
       float factor = 1.0;
       bool isDecimal = false;
-      while ((*ptr >= '0' && *ptr <= '9') || *ptr == '.')
-      { // Extract number
-        if (*ptr == '.')
-        {
+      while ((*ptr >= '0' && *ptr <= '9') || *ptr == '.') { // Extract number
+        if (*ptr == '.') {
           isDecimal = true;
           factor = 0.1;
-        }
-        else if (!isDecimal)
-        {
+        } else if (!isDecimal) {
           turn_angs = turn_angs * 10 + (*ptr - '0');
-        }
-        else
-        {
+        } else {
           turn_angs += (*ptr - '0') * factor;
           factor *= 0.1;
         }
         ptr++;
       }
-      if (turn_angs == 0)
-      {
+      if (turn_angs==0){
         right();
-      }
-      else
-      {
+      }else{
         right(turn_angs);
       }
       ptr++;
-      previousBack = false;
-    }
-    else if (*ptr == 'E')
-    {
-      if (previousBack)
-      {
-        end(0);
-      }
-      else
-      {
-        end(0); //-BOT_RADIUS
-      }
+    } else if (*ptr == 'E') {
+
+        end(0);//-BOT_RADIUS
+
       ptr++;
-      previousBack = false;
-    }
-    else if (*ptr == 'D')
-    {
+    } else if (*ptr == 'D') {
       ptr++;
       float delaytime = 0.0;
       float factor = 1.0;
       bool isDecimal = false;
-      while ((*ptr >= '0' && *ptr <= '9') || *ptr == '.')
-      { // Extract number
-        if (*ptr == '.')
-        {
+      while ((*ptr >= '0' && *ptr <= '9') || *ptr == '.') { // Extract number
+        if (*ptr == '.') {
           isDecimal = true;
           factor = 0.1;
-        }
-        else if (!isDecimal)
-        {
+        } else if (!isDecimal) {
           delaytime = delaytime * 10 + (*ptr - '0');
-        }
-        else
-        {
+        } else {
           delaytime += (*ptr - '0') * factor;
           factor *= 0.1;
         }
         ptr++;
       }
-      if (delaytime == 0)
-      {
+      if (delaytime==0){
         delay(500);
-      }
-      else
-      {
+      }else{
         delay(delaytime);
       }
       ptr++;
-      previousBack = false;
-    }
-    else
-    {
+    } else {
       ptr++; // Skip unrecognized characters
+     
     }
   }
 }
-// Pololu included gyro stuff
+//Pololu included gyro stuff
+
 
 // This should be called to set the starting point for measuring
 // a turn.  After calling this, turnAngle will be 0.
@@ -647,6 +610,7 @@ void turnSensorReset()
   turnAngle = 0;
 }
 
+
 // Read the gyro and update the angle.  This should be called as
 // frequently as possible while using the gyro to do turns.
 void turnSensorUpdate()
@@ -654,17 +618,14 @@ void turnSensorUpdate()
   // Read the measurements from the gyro.
   imu.readGyro();
   turnRate = imu.g.z - gyroOffset;
-  if (fabs(turnRate) * 0.07 < 0.1)
-  {
-    return;
-  }
+  if(fabs(turnRate) * 0.07 < 0.1){return;}
 
   // Figure out how much time has passed since the last update (dt)
   uint16_t m = micros();
   uint16_t dt = m - gyroLastUpdate;
   gyroLastUpdate = m;
-
-  double d = turnRate * 0.07 * dt / 1e6;
+  
+  double d = turnRate * 0.07 * dt/1e6;
 
   turnAngle += d;
 }

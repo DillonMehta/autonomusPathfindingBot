@@ -15,7 +15,7 @@ const int CLICKS_PER_ROTATION = 12;
 const float GEAR_RATIO = 29.86F;
 const float WHEEL_DIAMETER = 3.2;
 const float WHEEL_CIRCUMFERENCE = 10.22;
-const float BOT_RADIUS = 4.151; // cm horizontal radius(wheels to center)
+const float BOT_RADIUS = 4.43 ; // cm horizontal radius(wheels to center)
 bool buzzy=false;
 
 // Global variables for gyro-based turning
@@ -44,13 +44,13 @@ double Kpt = 0;            // proportional factor for turning
 double swerve_Kpt = 0;    
 double left_angle = 84.8;  // approx. “normal” left turn angle
 double right_angle = 83.8; // approx. “normal” right turn angle
-const double turnTime = 600;
+const double turnTime = 500;
 double full_turn = 174;
 
 // straight
 double kPs = 0.2; // small angle correction for going straight
 double kP = 0.4;  // for velocity control
-double swerve_kP = 0.1;
+double swerve_kP = 0.35;
 double str_min = 40;
 double mehta_sahni_constant = 0.082;
 
@@ -67,7 +67,8 @@ double wb_width = 6.35;
 // 30.3 is enter
 // for cali use 30 sec for 2 squares and 9 seconds for 4 backs
 //P= right back; O=left back (imgine the back is the front);
-char movement[200] = "F50.4 O O B100 P B20 F20 L F100 L L F20 B20 P P B50 O B100 O B75 F25 O O B100 P B20 F20 E";
+char movement[200] = "O O O O O O O O";
+//"F50 O O B100 P B20 F20 L F100 L L F20 B20 P P B50 O B100 O B75 F25 O O B100 P B20 F20 E";
 //"F80.3 R F50 L F50 L F100 R F50 B F50 L F100 L F50 R F50 R F50 L F50 L F50 B F150 R F50 R F50 B F50 L F50 L F100 L F100 L F50 R F100 L F50 L F50 L F50 R F50 L F50 L F50 E";
 // F30.3 F50 R F50 L F50 L F100 R F50 B F50 L F100 L F50 R F50 R F50 L F50 L F50 B F150 R F50 R F50 B F50 L F50 L F100 L F100 L F50 R F100 L F50 L F50 L F50 R F50 L F50 L F50 E
 // F50 L F50 L F50 L F50 L F50 L F50 L F50 L F50 L;
@@ -301,6 +302,7 @@ void back(double distance) {
 }
 //true is left, false is right
 void curveTurn(bool dir){
+  delay(200);
   double distance = (25 - BOT_RADIUS)* 3.14159 * 0.5;
   double ratio = (25.0-BOT_RADIUS)/(25.0+BOT_RADIUS);
   update();
@@ -347,7 +349,7 @@ void curveTurn(bool dir){
       velocity_setpoint = (16.0 * distance) / (3.0 * delta_T * delta_T) * ((delta_T / 4) - t_dec / 1e6);
     }
     */
-    velocity_setpoint = 20;
+    velocity_setpoint = 25;
     // Update PWM values based on velocity feedback and setpoint
     if(dir){
       velocity_error_L = velocity_setpoint - vL();
@@ -372,17 +374,16 @@ void curveTurn(bool dir){
     left_pwm = constrain(left_pwm, str_min, 400);
     right_pwm = constrain(right_pwm, str_min, 400);
     
-    if (dL() >= distance)
-    {
-      left_pwm = 0;
+    if(dir){
+      if (fabs(dL()) >= distance) {left_pwm = 0;}
+      if (fabs(dR()) >= (1 / ratio) * distance) {right_pwm = 0;}
+      if (fabs(dL()) >= distance && fabs(dR()) >= (1 / ratio) * distance){break;}
+    }else{
+      if (fabs(dR()) >= distance) {left_pwm = 0;}
+      if (fabs(dL()) >= (1 / ratio) * distance) {right_pwm = 0;}
+      if (fabs(dR()) >= distance && fabs(dL()) >= (1 / ratio) * distance){break;}
     }
-    if (dR () >= 1/ratio * distance)
-    {
-      right_pwm = 0;
-    }
-    if(dL() >= distance && dR () >= 1/ratio * distance){
-      break;
-    }
+
     // Set motor speeds
     motors.setSpeeds(left_pwm, right_pwm);
   }
@@ -393,6 +394,65 @@ void curveTurn(bool dir){
   reset();                 // Reset necessary parameters
 
 }
+void curveTurnBack(bool dir){
+  double distance = (25 - BOT_RADIUS) * 3.14159 * 0.5;
+  double ratio = (25.0 - BOT_RADIUS) / (25.0 + BOT_RADIUS);
+  update();
+  double t0 = micros(); 
+  double delta_T = turnTime;
+  double delta_T_us = delta_T * 1e3;
+
+  double left_pwm, right_pwm;
+
+  if(dir){
+    left_pwm = -str_min;
+    right_pwm = -str_min * 1 / ratio;
+  } else {
+    right_pwm = -str_min;
+    left_pwm = -str_min * 1 / ratio;
+  }
+
+  double velocity_setpoint = 0;
+  double elapsed_time;
+
+  while (true)
+  {
+    elapsed_time = micros() - t0; 
+    update();
+
+    velocity_setpoint = -25; 
+
+    if(dir){
+      velocity_error_L = velocity_setpoint - vL();
+      velocity_error_R = (1.0 / ratio) * velocity_setpoint - vR();
+    } else {
+      velocity_error_L = (1.0 / ratio) * velocity_setpoint - vL();
+      velocity_error_R = velocity_setpoint - vR();
+    }
+    
+    left_pwm += swerve_kP * velocity_error_L;
+    right_pwm += swerve_kP * velocity_error_R;
+
+    left_pwm = constrain(left_pwm, -400, -str_min);
+    right_pwm = constrain(right_pwm, -400, -str_min);
+    if(dir){
+      if (fabs(dL()) >= distance) {left_pwm = 0;}
+      if (fabs(dR()) >= (1 / ratio) * distance) {right_pwm = 0;}
+      if (fabs(dL()) >= distance && fabs(dR()) >= (1 / ratio) * distance){break;}
+    }else{
+      if (fabs(dR()) >= distance) {left_pwm = 0;}
+      if (fabs(dL()) >= (1 / ratio) * distance) {right_pwm = 0;}
+      if (fabs(dR()) >= distance && fabs(dL()) >= (1 / ratio) * distance){break;}
+    }
+
+    motors.setSpeeds(left_pwm, right_pwm);
+  }
+
+  motors.setSpeeds(0, 0);
+  delay(110 + delayer_amt); 
+  reset(); 
+}
+
 
 void left()
 {
@@ -451,65 +511,7 @@ void right(int val) {
   delay(250);
   reset();
 }
-void curveTurnBack(bool dir){
-  double distance = (25 - BOT_RADIUS) * 3.14159 * 0.5;
-  double ratio = (25.0 - BOT_RADIUS) / (25.0 + BOT_RADIUS);
-  update();
-  double t0 = micros(); 
-  double delta_T = turnTime;
-  double delta_T_us = delta_T * 1e3;
 
-  double left_pwm, right_pwm;
-
-  if(dir){
-    left_pwm = -str_min;
-    right_pwm = -str_min * 1 / ratio;
-  } else {
-    right_pwm = -str_min;
-    left_pwm = -str_min * 1 / ratio;
-  }
-
-  double velocity_setpoint = 0;
-  double elapsed_time;
-
-  while (true)
-  {
-    elapsed_time = micros() - t0; 
-    update();
-
-    velocity_setpoint = -20; 
-
-    if(dir){
-      velocity_error_L = velocity_setpoint - vL();
-      velocity_error_R = (1.0 / ratio) * velocity_setpoint - vR();
-    } else {
-      velocity_error_L = (1.0 / ratio) * velocity_setpoint - vL();
-      velocity_error_R = velocity_setpoint - vR();
-    }
-
-    left_pwm += swerve_kP * velocity_error_L;
-    right_pwm += swerve_kP * velocity_error_R;
-
-    left_pwm = constrain(left_pwm, -400, -str_min);
-    right_pwm = constrain(right_pwm, -400, -str_min);
-
-    if (fabs(dL()) >= distance) {
-      left_pwm = 0;
-    }
-    if (fabs(dR()) >= (1 / ratio) * distance) {
-      right_pwm = 0;
-    }
-    if (fabs(dL()) >= distance && fabs(dR()) >= (1 / ratio) * distance){
-      break;
-    }
-
-    motors.setSpeeds(left_pwm, right_pwm);
-  }
-
-  motors.setSpeeds(0, 0);
-  delay(110 + delayer_amt); 
-  reset(); 
-}
 
 // helper functions -----------------------------------------------------------------------
 
@@ -568,13 +570,9 @@ void calculateTotalTurns(const char *commands)
   const char *ptr = commands;
   while (*ptr != '\0')
   {
-    if (*ptr == 'L' || *ptr == 'R')
+    if (*ptr == 'L' || *ptr == 'R' || *ptr == 'O' || *ptr == 'P')
     {
       total_turns++;
-    }
-    else if (*ptr == 'B')
-    {
-      total_turns += 2;
     }
     ptr++;
   }
